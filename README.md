@@ -11,6 +11,7 @@ A robust TypeScript scraper that extracts council meeting data from the Lansinge
 - ✅ **Multiple Output Formats**: Standard JSON transcript format or simplified meeting format
 - ✅ **Future Meeting Support**: Handles meetings without available video content
 - ✅ **Comprehensive Testing**: Acceptance tests with known working examples
+- ✅ **Auto-Discovery**: Automatically discover and process meetings from the portal calendar
 
 ## Quick Start
 
@@ -20,6 +21,12 @@ npm install
 
 # Scrape a single meeting
 npm run scrape -- "https://lansingerland.bestuurlijkeinformatie.nl/Agenda/Index/8f592da7-0c24-41ac-9423-c4cbe40252a0"
+
+# Auto-discover and process recent meetings
+npm run scrape -- auto --days -30 --meeting-types "Gemeenteraad"
+
+# Discover available meetings
+npm run scrape -- discover --days -90
 
 # Run acceptance tests
 npm test
@@ -51,6 +58,22 @@ npm run scrape -- <agenda-url> --output ./my-output --rate-limit 2000 --simplifi
 npm run scrape -- "https://lansingerland.bestuurlijkeinformatie.nl/Agenda/Index/8f592da7-0c24-41ac-9423-c4cbe40252a0" --output ./output
 ```
 
+#### Auto-Discovery and Processing
+
+```bash
+# Discover meetings from the portal calendar
+npm run scrape -- discover --days -30 --meeting-types "Gemeenteraad"
+
+# Auto-discover and process recent council meetings
+npm run scrape -- auto --days -30 --meeting-types "Gemeenteraad" --output ./output
+
+# Auto-discover and process all meeting types in the past 90 days
+npm run scrape -- auto --days -90 --output ./output --continue-on-error
+
+# Discover upcoming meetings
+npm run scrape -- discover --days +30
+```
+
 #### Batch Processing
 
 ```bash
@@ -63,6 +86,8 @@ npm run scrape -- batch urls.txt --output ./output --continue-on-error
 
 ### CLI Options
 
+#### Single Meeting Options
+
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--output, -o` | Output directory | `./output` |
@@ -71,6 +96,16 @@ npm run scrape -- batch urls.txt --output ./output --continue-on-error
 | `--skip-existing, -s` | Skip if output file already exists | `false` |
 | `--simplified` | Use simplified JSON output format | `false` |
 | `--continue-on-error, -c` | Continue batch processing on errors | `false` |
+
+#### Discovery Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--days` | Date range in days (negative for past, positive for future) | `-365` |
+| `--meeting-types` | Filter by meeting type (e.g., "Gemeenteraad", "Commissie") | All types |
+| `--from-date` | Start date (YYYY-MM-DD format) | 1 year ago |
+| `--to-date` | End date (YYYY-MM-DD format) | 1 year from now |
+| `--include-cancelled` | Include cancelled meetings | `false` |
 
 ## Output Format
 
@@ -174,6 +209,7 @@ cp .env.example .env
 
 ### Core Components
 
+- **MeetingDiscovery**: Automatically discovers meetings from the Lansingerland calendar portal
 - **AgendaScraper**: Extracts meeting metadata and speaker windows from HTML
 - **WebcastResolver**: Interfaces with Company Webcast API to resolve UUIDs and download VTT
 - **VTTProcessor**: Parses WebVTT content and extracts timestamped cues
@@ -182,6 +218,12 @@ cp .env.example .env
 
 ### Data Flow
 
+#### Auto-Discovery Mode
+1. **Calendar Discovery** → Parse Lansingerland calendar for meetings by date range and type
+2. **Meeting Filtering** → Apply date filters, meeting type filters, and exclusions
+3. **Batch Processing** → Process each discovered meeting using standard flow below
+
+#### Single Meeting Mode
 1. **Discover** → Extract meeting UUID from agenda URL
 2. **Scrape** → Parse HTML for meeting metadata, agenda items, and speaker windows
 3. **Resolve** → Convert webcast code to internal UUID via Company Webcast API
@@ -325,7 +367,11 @@ VERBOSE_TESTS=1 npm test
 src/
 ├── alignment/          # Speaker and agenda alignment
 ├── builders/          # JSON output builders
-├── scraper/           # Core scraping components
+├── scraper/           # Core scraping and discovery components
+│   ├── AgendaScraper.ts
+│   ├── MeetingDiscovery.ts  # NEW: Auto-discovery functionality
+│   ├── VTTProcessor.ts
+│   └── WebcastResolver.ts
 ├── types/             # TypeScript type definitions
 ├── utils/             # Utility functions
 └── tests/             # Acceptance tests
