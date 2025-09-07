@@ -27,13 +27,26 @@ export class AgendaScraper {
       
       // Extract basic meeting info
       const title = this.extractTitle($);
-      const dateInfo = this.extractDateInfo($);
       const location = this.extractLocation($);
       const chairperson = this.extractChairperson($);
       const timeInfo = this.extractTimeInfo($);
       
-      // Extract webcast code
+      // Extract webcast code first
       const webcastCode = this.extractWebcastCode(response.data);
+      
+      // Extract date - prefer webcast date if available
+      let dateInfo = this.extractDateInfo($);
+      if (webcastCode) {
+        const webcastDate = this.extractDateFromWebcastCode(webcastCode);
+        if (webcastDate) {
+          logger.debug(`Using webcast date ${webcastDate} instead of HTML date ${dateInfo}`, {
+            webcastCode,
+            htmlDate: dateInfo,
+            webcastDate
+          });
+          dateInfo = webcastDate;
+        }
+      }
       
       // Extract agenda items with speakers
       const agendaItems = this.extractAgendaItems($);
@@ -52,7 +65,8 @@ export class AgendaScraper {
       
       logger.info(`Successfully scraped meeting: ${title}`, { 
         agendaItems: agendaItems.length,
-        webcastCode: webcastCode || 'not found'
+        webcastCode: webcastCode || 'not found',
+        finalDate: dateInfo
       });
       
       return meetingData;
@@ -230,6 +244,21 @@ export class AgendaScraper {
     }
     
     return undefined;
+  }
+
+  /**
+   * Extract date from webcast code format: gemeentelansingerland_YYYYMMDD_N
+   */
+  private extractDateFromWebcastCode(webcastCode: string): string | null {
+    const match = webcastCode.match(/gemeentelansingerland_(\d{8})_\d+/);
+    if (match) {
+      const dateStr = match[1]; // YYYYMMDD
+      const year = dateStr.substring(0, 4);
+      const month = dateStr.substring(4, 6);
+      const day = dateStr.substring(6, 8);
+      return `${year}-${month}-${day}`;
+    }
+    return null;
   }
 
   private extractAgendaItems($: cheerio.CheerioAPI): AgendaItem[] {
